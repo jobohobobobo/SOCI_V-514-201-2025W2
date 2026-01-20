@@ -1,0 +1,193 @@
+---
+title: "Assignment 1 — Bivariate Regression and Residuals (OECD Welfare State Data)"
+output:
+  pdf_document: default
+  html_document: default
+---
+# Introduction
+
+  A central proposition in comparative welfare-state scholarship holds that partisan political configurations exert systematic influence on the scope and redistributive character of social policy regimes (Iversen and Stephens 2008). Specifically, the power resources theory suggests that left- and labor-party representatives, representing working-class constituencies, advocate for more extensive social protections precisely because such decommodifying programs, defined as policies that reduce individuals’ dependence on labor-market participation for securing basic welfare, disproportionately benefit their core electoral base (Bambra 2007). This theoretical framework implies that nations with greater left-party representation in government should exhibit higher levels of welfare-state decommodification. Building on this theoretical foundation, the present analysis empirically evaluates this proposition utilizing cross-national OECD data, examining whether left government representation significantly predicts variation in decommodification across advanced industrial democracies.
+
+# Research question and hypothesis
+
+Research Question: To what extent does left/labor government representation predict welfare state decommodification across OECD member states?
+  This research question is operationalized through a bivariate regression specification that directly corresponds to the following formal hypothesis test:
+* Null hypothesis (H0): Left government representation is unrelated to decommodification ($\beta_1 = 0$).
+* Alternative hypothesis (H1): Greater left representation is associated with higher decommodification ($\beta_1 > 0$).
+
+# Data
+  The OECD dataset includes four variables:
+* decom (Decommodification): An index measuring welfare state development; higher values indicate more egalitarian welfare states.
+* left (Left-party representation): The share of legislative and cabinet seats held by left parties.
+* GDP: GDP per capita (in thousands of dollars).
+* gt65: Percent of the population aged 65 and older.
+  In this context, the present analysis specifies decom as the dependent variable and left as the independent variable. While GDP and gt65 are theoretically plausible determinants of welfare state development, this study adopts a parsimonious bivariate specification to provide an initial empirical assessment of the partisan politics hypothesis. This approach enables a focused examination of the core relationship before incorporating additional control variables in subsequent multivariate models.
+  
+# Methods
+  I estimate a bivariate ordinary least squares (OLS) regression:
+$$ decom_i = \beta_0 + \beta_1(left_{i} + \epsilon_{i} $$ 
+where $\beta_0$ is the intercept (expected decommodification when left = 0), $beta_1$ captures the expected change in decommodification for a one-unit increase in left representation, and $\epsilon_{i}$ is the country-specific error term. Model fit is assessed using R² and the overall F-test, and residuals are examined to identify countries that are well explained by the model versus those poorly explained.
+
+# Analysis
+
+## Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# Packages (install if needed)
+pkgs <- c("ggplot2", "broom", "dplyr", "readr", "knitr")
+to_install <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
+if (length(to_install) > 0) install.packages(to_install)
+
+library(ggplot2)
+library(broom)
+library(dplyr)
+library(readr)
+library(knitr)
+```
+
+```{r}
+# Load the OECD Welfare State Data
+df <- read_csv("~/SOCI_V 514 201 2025W2/Homework/Data/oecd.csv")
+df
+```
+
+```{r}
+# data cleaning
+df <- df %>%
+mutate(
+decom = as.numeric(decom),
+left = as.numeric(left)
+)
+df
+```
+
+## Descriptive statistics
+
+```{r}
+desc <- summary(df[, c("decom", "left")])
+kable(desc, caption = "Table 1. Descriptive statistics") %>%
+kableExtra::kable_styling(full_width = TRUE)
+```
+
+## Bivariate Regression Modeling
+```{r}
+m1 <- lm(decom ~ left, data = df)
+# Model output
+summary(m1)
+```
+```{r}
+## Tidy model output
+tab <- broom::tidy(m1) %>%
+mutate(
+estimate = round(estimate, 4),
+std.error = round(std.error, 4),
+statistic = round(statistic, 3),
+p.value = signif(p.value, 3)
+)
+
+fit <- broom::glance(m1) %>%
+transmute(
+n = nobs,
+r2 = round(r.squared, 4),
+adj_r2 = round(adj.r.squared, 4),
+rmse = round(sigma, 4),
+f_stat = round(statistic, 3),
+f_p = signif(p.value, 3)
+)
+
+kable(tab, caption = "Table 1. OLS regression predicting decommodification from left party representation") %>%
+kableExtra::kable_styling(full_width = FALSE)
+
+```
+
+## Data Visualization
+
+```{r}
+## Scatterplot with regression line
+p <- ggplot(df, aes(x = left, y = decom)) +
+geom_point(size = 2) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Decommodification vs. Left Party Representation",
+x = "Left party representation (share of seats)",
+y = "Decommodification (higher = more egalitarian)"
+)
+
+p
+```
+# Results
+  The regression results indicate a positive, statistically significant association between left-party representation and welfare-state decommodification. The estimated regression equation is:
+$$
+\widehat{decom} = 22.6877 + 1.6140(left)
+$$
+  The intercept shows the predicted decommodification score when the left party representation is zero. This number acts as a reference point, not the main theoretical focus. The estimate is precise and statistically significant (p < 0.001).
+  The slope coefficient is the main result of interest. It shows that countries with greater left- or labor-party representation have higher levels of decommodification. A one-unit increase in left government representation predicts a 1.614-point increase in decommodification, holding all else constant. The p-value (0.02) shows this is statistically significant at the 0.05 level. Therefore, we reject the null hypothesis of no relationship.
+  Next, I assess model fit and the overall statistical significance of the regression results. The model explains about 29% of the variation in decommodification across countries: $R^2$ = 0.2943 (adjusted $R^2$ = 0.2502). Left government representation alone accounts for about 29% of the variance in decommodification in this OECD sample. This means that while partisan composition matters, most variation comes from other factors. The overall F-test confirms the model's significance: F(1,16) = 6.672, p = 0.02002.
+
+# Residual analysis
+  To further contextualize these results, I examine the dispersion of the residuals.
+Residuals range from -12.4314 to +7.6142, and the standard error is 6.686 (df = 16). This range shows that, even though the average link is significant, countries differ substantially from the fitted line. This means that left government representation does not equally well predict decommodification across all countries.
+
+```{r}
+plot(m1, which = 1) # residuals vs fitted
+plot(m1, which = 2) # normal Q-Q
+```
+  
+  The scatterplot with the fitted regression line backs up the statistical findings. Decommodification rises with left government representation, but there’s a lot of spread around the line. To check model performance in detail, I look at residuals for individual countries.
+$$
+e_i = decom_i - \widehat{decom}_i
+$$
+  Nations exhibiting residuals proximate to zero are located near the regression line, indicating that left government representation constitutes a relatively robust predictor of decommodification in these contexts. Conversely, countries characterized by large absolute residuals deviate substantially from the fitted line, suggesting that left representation possesses limited explanatory power in these cases and that alternative factors likely exert dominant influence over welfare state outcomes.
+  
+```{r}
+res_summary <- summary(resid(m1))
+res_mat <- as.matrix(res_summary)
+kable(res_mat, caption = "Table 2. Summary statistics of residuals from bivariate regression model") %>%
+kableExtra::kable_styling(full_width = FALSE)
+```
+
+```{r}
+df_res <- df %>%
+mutate(
+fitted = fitted(m1),
+resid = resid(m1),
+abs_resid = abs(resid),
+std_resid = rstandard(m1)
+) %>%
+arrange(desc(abs_resid))
+
+# Countries where left predicts decom well (small residuals)
+best_fit <- df_res %>% arrange(abs_resid) %>% select(country, left, decom, fitted, resid, std_resid) %>% head(6)
+
+# Countries where left predicts decom poorly (large residuals)
+worst_fit <- df_res %>% select(country, left, decom, fitted, resid, std_resid) %>% head(6)
+
+kable(best_fit, caption = "Countries where left party representation predicts decommodification well") %>% kableExtra::kable_styling(full_width = TRUE)
+kable(worst_fit, caption = "Countries where left party representation predicts decommodification poorly") %>% kableExtra::kable_styling(full_width = TRUE)
+```
+  Specifically, I identify countries where left representation predicts decommodification well. The closest-fitting cases are:
+* Ireland (resid = -0.033)
+* Italy (resid = +0.283)
+* Finland (resid = +0.379)
+* Canada (resid = -0.688)
+  These countries have small residuals, meaning observed decommodification matches model predictions based on left government representation. France (resid = +3.198) and Austria (resid = -3.854) fit better than the biggest outliers, but their residuals are still larger than those of the best-fitting cases.
+  Conversely countries where left representation poorly predicts decommodification. The largest mismatches between predicted and observed decommodification are:
+* Australia (resid = -12.431)
+* United Kingdom (resid = -9.456)
+* United States (resid = -8.888)
+* New Zealand (resid = -8.331)
+  In these countries, the regression model predicts higher decommodification than observed. This shows that left-wing government representation alone does not explain the crucial institutions or political limits that affect welfare-state development there. On the other hand, some countries have much higher decommodification than would be predicted by left representation alone.
+* Netherlands (resid = +7.614)
+* Belgium (resid = +7.130)
+  In these countries, the regression underestimates the actual level of decommodification. These nations have more egalitarian welfare states than the model would predict, suggesting that other political groups or institutions play a role beyond partisan representation.
+  The spread of the residuals shows the bivariate partisan link is strong but varies widely across countries. Left government representation predicts welfare-state egalitarianism well in some countries, but less so in others. This fits with welfare state research, which says outcomes depend on more than just party make-up, like institutions, coalitions, policy history, and social and economic settings, not included in this simple model.
+
+# Conclusion
+  This analysis shows that left- or labor-party representation is positively linked to decommodification across the OECD. The bivariate regression finds a statistically significant positive slope (β₁ = 1.6140, p = 0.02) and overall model significance (F = 6.672, p = 0.02002). Left representation alone explains about 29% of the variance, a meaningful but incomplete association.
+  Notwithstanding these findings, the residual analysis reveals important limitations of the parsimonious partisan explanation. Multiple national cases exhibit substantial deviations from model predictions, demonstrating that left representation has strong predictive validity in certain institutional contexts but limited explanatory power in others. These systematic residual patterns strongly indicate the need for subsequent multivariate specifications that incorporate additional theoretically salient determinants of decommodification—particularly GDP per capita and demographic aging (gt65) —alongside institutional and historical variables unavailable in the present dataset. In sum, the empirical evidence corroborates the theoretical claim that partisan political configurations constitute a significant determinant of welfare state egalitarianism, while simultaneously demonstrating that partisan effects operate contingently within a broader constellation of political-economic and institutional factors that condition welfare state development across advanced democracies.
+
+# References
+Bambra, C. 2007. “Going beyond The Three Worlds of Welfare Capitalism: Regime Theory and Public Health Research: Table 1.” Journal of Epidemiology and Community Health 61(12):1098–1102. doi:10.1136/jech.2007.064295.
+Iversen, Torben, and John D. Stephens. 2008. “Partisan Politics, the Welfare State, and Three Worlds of Human Capital Formation.” Comparative Political Studies 41(4–5):600–637. doi:10.1177/0010414007313117.
+
